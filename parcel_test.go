@@ -48,20 +48,25 @@ func TestAddGetDelete(t *testing.T) {
 	store := NewParcelStore(db)
 	parcel := getTestParcel()
 
+	// Add
 	id, err := store.Add(parcel)
 	require.NoError(t, err)
 	require.NotZero(t, id)
 
+	// Get
 	storedParcel, err := store.Get(id)
 	require.NoError(t, err)
-	require.Equal(t, parcel.Client, storedParcel.Client)
-	require.Equal(t, parcel.Status, storedParcel.Status)
-	require.Equal(t, parcel.Address, storedParcel.Address)
-	require.Equal(t, parcel.CreatedAt, storedParcel.CreatedAt)
 
+	// Сравнение структур, игнорируя поле Number
+	expectedParcel := parcel
+	expectedParcel.Number = id
+	require.Equal(t, expectedParcel, storedParcel)
+
+	// Delete
 	err = store.Delete(id)
 	require.NoError(t, err)
 
+	// Verify Delete
 	_, err = store.Get(id)
 	require.Error(t, err)
 }
@@ -73,14 +78,17 @@ func TestSetAddress(t *testing.T) {
 	store := NewParcelStore(db)
 	parcel := getTestParcel()
 
+	// Add
 	id, err := store.Add(parcel)
 	require.NoError(t, err)
 	require.NotZero(t, id)
 
+	// Set Address
 	newAddress := "new test address"
 	err = store.SetAddress(id, newAddress)
 	require.NoError(t, err)
 
+	// Get and verify address update
 	storedParcel, err := store.Get(id)
 	require.NoError(t, err)
 	require.Equal(t, newAddress, storedParcel.Address)
@@ -93,14 +101,17 @@ func TestSetStatus(t *testing.T) {
 	store := NewParcelStore(db)
 	parcel := getTestParcel()
 
+	// Add
 	id, err := store.Add(parcel)
 	require.NoError(t, err)
 	require.NotZero(t, id)
 
+	// Set Status
 	newStatus := ParcelStatusSent
 	err = store.SetStatus(id, newStatus)
 	require.NoError(t, err)
 
+	// Get and verify status update
 	storedParcel, err := store.Get(id)
 	require.NoError(t, err)
 	require.Equal(t, newStatus, storedParcel.Status)
@@ -119,18 +130,25 @@ func TestGetByClient(t *testing.T) {
 		getTestParcel(),
 	}
 
+	parcelMap := make(map[int]Parcel)
+
 	for i := range parcels {
 		parcels[i].Client = clientID
 		id, err := store.Add(parcels[i])
 		require.NoError(t, err)
 		parcels[i].Number = id
+		parcelMap[id] = parcels[i]
 	}
 
+	// Get by client
 	storedParcels, err := store.GetByClient(clientID)
 	require.NoError(t, err)
 	require.Len(t, storedParcels, len(parcels))
 
+	// Check each parcel
 	for _, storedParcel := range storedParcels {
-		require.Contains(t, parcels, storedParcel)
+		expectedParcel, exists := parcelMap[storedParcel.Number]
+		require.True(t, exists)
+		require.Equal(t, expectedParcel, storedParcel)
 	}
 }

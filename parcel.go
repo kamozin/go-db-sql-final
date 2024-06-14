@@ -31,7 +31,7 @@ func (s *ParcelStore) Get(number int) (Parcel, error) {
 	var p Parcel
 	err := row.Scan(&p.Number, &p.Client, &p.Status, &p.Address, &p.CreatedAt)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return p, errors.New("no parcel found with the given number")
 		}
 		return p, err
@@ -54,40 +54,23 @@ func (s *ParcelStore) GetByClient(client int) ([]Parcel, error) {
 		}
 		parcels = append(parcels, p)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return parcels, nil
 }
 
 func (s *ParcelStore) SetStatus(number int, status string) error {
-	_, err := s.db.Exec("UPDATE parcel SET status = ? WHERE number = ?", status, number)
+	_, err := s.db.Exec("UPDATE parcel SET status = ? WHERE number = ? AND status != ?", status, number, ParcelStatusDelivered)
 	return err
 }
 
 func (s *ParcelStore) SetAddress(number int, address string) error {
-	var status string
-	err := s.db.QueryRow("SELECT status FROM parcel WHERE number = ?", number).Scan(&status)
-	if err != nil {
-		return err
-	}
-
-	if status != ParcelStatusRegistered {
-		return errors.New("cannot change address, parcel is not in 'registered' status")
-	}
-
-	_, err = s.db.Exec("UPDATE parcel SET address = ? WHERE number = ?", address, number)
+	_, err := s.db.Exec("UPDATE parcel SET address = ? WHERE number = ? AND status = ?", address, number, ParcelStatusRegistered)
 	return err
 }
 
 func (s *ParcelStore) Delete(number int) error {
-	var status string
-	err := s.db.QueryRow("SELECT status FROM parcel WHERE number = ?", number).Scan(&status)
-	if err != nil {
-		return err
-	}
-
-	if status != ParcelStatusRegistered {
-		return errors.New("cannot delete, parcel is not in 'registered' status")
-	}
-
-	_, err = s.db.Exec("DELETE FROM parcel WHERE number = ?", number)
+	_, err := s.db.Exec("DELETE FROM parcel WHERE number = ? AND status = ?", number, ParcelStatusRegistered)
 	return err
 }
